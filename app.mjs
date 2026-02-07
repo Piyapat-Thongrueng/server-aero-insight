@@ -2,6 +2,7 @@ import "dotenv/config";
 import express from "express";
 import cors from "cors";
 import connectionPool from "./utils/db.mjs";
+import PostRouter from "./routes/postRoute.mjs";
 
 const app = express();
 const PORT = process.env.PORT || 4000;
@@ -16,6 +17,7 @@ app.use(
     ],
   }),
 );
+app.use("/posts", PostRouter);
 
 app.get("/profiles", (req, res) => {
   return res.status(200).json({
@@ -58,17 +60,17 @@ app.post("/posts", async (req, res) => {
   }
 });
 
-app.get("/posts", async (req, res) => {
-  try {
-    const results = await connectionPool.query("SELECT * FROM posts");
-    return res.status(200).json({ data: results.rows });
-  } catch (error) {
-    console.error("Error fetching posts:", error);
-    return res.status(500).json({
-      message: "Server could not fetch posts because database connection",
-    });
-  }
-});
+// app.get("/posts", async (req, res) => {
+//   try {
+//     const results = await connectionPool.query("SELECT * FROM posts");
+//     return res.status(200).json({ data: results.rows });
+//   } catch (error) {
+//     console.error("Error fetching posts:", error);
+//     return res.status(500).json({
+//       message: "Server could not fetch posts because database connection",
+//     });
+//   }
+// });
 
 app.listen(PORT, () => {
   console.log(`Server is running on http://localhost:${PORT}`);
