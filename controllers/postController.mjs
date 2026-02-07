@@ -3,8 +3,17 @@ import PostService from "../services/postService.mjs";
 const PostController = {
   getAllPosts: async (req, res) => {
     try {
-      const posts = await PostService.getAllPosts();
-      return res.status(200).json({ data: posts.rows });
+      const posts = await PostService.getAllPosts(req);
+      const response = {
+        totalPosts: posts.totalPosts, // จำนวน posts ทั้งหมดในระบบ
+        totalPages: posts.totalPages, // จำนวนหน้าทั้งหมด
+        currentPage: posts.currentPage, // หน้าปัจจุบัน
+        limit: posts.limit, // จำนวน posts ต่อหน้า
+        posts: posts.rows, // array ของ posts
+        nextPage: posts.nextPage, // หน้าถัดไป (null ถ้าเป็นหน้าสุดท้าย)
+      };
+
+      return res.status(200).json(response);
     } catch (error) {
       console.error("Error fetching posts:", error);
       return res.status(500).json({

@@ -1,8 +1,54 @@
 import connectionPool from "../utils/db.mjs";
 
 const PostRepository = {
-  findAllPosts: async () => {
-    return await connectionPool.query("SELECT * FROM posts");
+  findAllPosts: async (filters) => {
+    const { category, keyword, limit, offset } = filters;
+    // Query สำหรับนับจำนวนทั้งหมด
+    let countQuery = "SELECT COUNT(*) FROM posts";
+    let countValues = [];
+    let query = "SELECT * FROM posts";
+    let values = [];
+
+    if (category && keyword) {
+      const whereClause = " WHERE category ILIKE $1 AND keyword ILIKE $2";
+      countQuery += whereClause;
+      countValues = [`%${category}%`, `%${keyword}%`];
+
+      query += whereClause + " LIMIT $3 OFFSET $4";
+      values = [`%${category}%`, `%${keyword}%`, limit, offset];
+    } else if (category) {
+      const whereClause = " WHERE category ILIKE $1";
+      countQuery += whereClause;
+      countValues = [`%${category}%`];
+
+      query += whereClause + " LIMIT $2 OFFSET $3";
+      values = [`%${category}%`, limit, offset];
+    } else if (keyword) {
+      const whereClause = " WHERE keyword ILIKE $1";
+      countQuery += whereClause;
+      countValues = [`%${keyword}%`];
+
+      query += whereClause + " LIMIT $2 OFFSET $3";
+      values = [`%${keyword}%`, limit, offset];
+    } else {
+      query += " LIMIT $1 OFFSET $2";
+      values = [limit, offset];
+    }
+    // Execute queries
+    const countResult = await connectionPool.query(countQuery, countValues);
+    const postsResult = await connectionPool.query(query, values);
+
+    const totalPosts = parseInt(countResult.rows[0].count);
+    const totalPages = Math.ceil(totalPosts / limit);
+    const currentPage = Math.floor(offset / limit) + 1;
+    return {
+      totalPosts,
+      totalPages,
+      currentPage,
+      limit,
+      rows: postsResult.rows,
+      nextPage: currentPage < totalPages ? currentPage + 1 : null,
+    };
   },
   createPost: async (postData) => {
     return await connectionPool.query(
