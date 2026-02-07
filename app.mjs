@@ -17,6 +17,7 @@ app.use(
     ],
   }),
 );
+
 app.use("/posts", PostRouter);
 
 app.get("/profiles", (req, res) => {
@@ -60,17 +61,6 @@ app.post("/posts", async (req, res) => {
   }
 });
 
-// app.get("/posts", async (req, res) => {
-//   try {
-//     const results = await connectionPool.query("SELECT * FROM posts");
-//     return res.status(200).json({ data: results.rows });
-//   } catch (error) {
-//     console.error("Error fetching posts:", error);
-//     return res.status(500).json({
-//       message: "Server could not fetch posts because database connection",
-//     });
-//   }
-// });
 
 app.listen(PORT, () => {
   console.log(`Server is running on http://localhost:${PORT}`);
