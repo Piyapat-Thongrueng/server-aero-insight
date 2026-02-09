@@ -2,7 +2,7 @@ import connectionPool from "../utils/db.mjs";
 
 const PostRepository = {
   findAllPosts: async (filters) => {
-    const { category, keyword, limit, offset } = filters;
+    let { category, keyword, limit, offset } = filters;
     // Query สำหรับนับจำนวนทั้งหมด
     let countQuery = "SELECT COUNT(*) FROM posts";
     let countValues = [];
