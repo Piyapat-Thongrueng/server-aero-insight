@@ -7,7 +7,7 @@ const PostService = {
     const pageParam = parseInt(req.query.page) || 1;
     const PAGE_SIZE = 6;
     const offset = (pageParam - 1) * PAGE_SIZE;
-    
+
     // ถ้า category เป็นสตริงว่าง ให้กำหนดเป็น null แทน
     if (typeof categoryParam !== "string" || categoryParam.trim() === "") {
       categoryParam = null;

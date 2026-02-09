@@ -1,3 +1,5 @@
+// รับผิดชอบเฉพาะการจัดการ request และ response ที่เกี่ยวข้องกับ posts เท่านั้น ไม่มี logic อื่นใด
+
 import PostService from "../services/postService.mjs";
 
 const PostController = {
@@ -47,10 +49,11 @@ const PostController = {
     const { postId } = req.params;
     try {
       const post = await PostService.getPostById(postId);
-      if (post.rows.length === 0) {
+
+      if (!post) {
         return res.status(404).json({ message: "Post not found" });
       }
-      return res.status(200).json({ data: post.rows[0] });
+      return res.status(200).json({ data: post });
     } catch (error) {
       console.error("Error fetching post by ID:", error);
       return res.status(500).json({
