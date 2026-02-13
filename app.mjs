@@ -1,8 +1,8 @@
 import "dotenv/config";
 import express from "express";
 import cors from "cors";
-import connectionPool from "./utils/db.mjs";
 import PostRouter from "./routes/postRoute.mjs";
+import authRouter from "./routes/auth.mjs";
 
 const app = express();
 const PORT = process.env.PORT || 4000;
@@ -19,6 +19,7 @@ app.use(
 );
 
 app.use("/posts", PostRouter);
+app.use("/auth", authRouter);
 
 
 app.listen(PORT, () => {
