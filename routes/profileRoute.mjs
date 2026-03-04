@@ -29,13 +29,13 @@ const multerUpload = multer({
   },
 });
 
-// ✅ อัพโหดรูปภาพจากฟอร์มที่มีชื่อฟิลด์ "imageFile" และจำกัดจำนวนไฟล์ที่อัพโหลดได้เป็น 1 ไฟล์ต่อคำขอ
+// อัพโหดรูปภาพจากฟอร์มที่มีชื่อฟิลด์ "imageFile" และจำกัดจำนวนไฟล์ที่อัพโหลดได้เป็น 1 ไฟล์ต่อคำขอ
 // .fields() จะช่วยให้เราสามารถจัดการกับหลายฟิลด์ที่มีไฟล์ได้ในครั้งเดียว แต่ในกรณีนี้เรากำหนดแค่ฟิลด์เดียวคือ "imageFile"
 const imageFileUpload = multerUpload.fields([
   { name: "imageFile", maxCount: 1 },
 ]);
 
-// ✅ Helper function: Sanitize text
+// Helper function: Sanitize text
 const sanitize = (text) => {
   return text
     .trim()
@@ -43,7 +43,7 @@ const sanitize = (text) => {
     .replace(/<[^>]*>/g, "");
 };
 
-// ✅ Helper function: Delete old image
+// Helper function: Delete old image
 const deleteOldImage = async (imageUrl, bucketName) => {
   if (!imageUrl || !imageUrl.includes(bucketName)) return;
 
@@ -67,9 +67,7 @@ profileRouter.put("/", [imageFileUpload, protectUser], async (req, res) => {
   try {
     const updates = {};
 
-    // ============================================
     // 1. VALIDATE NAME
-    // ============================================
     if (name !== undefined) {
       const sanitizedName = sanitize(name);
 
@@ -90,9 +88,8 @@ profileRouter.put("/", [imageFileUpload, protectUser], async (req, res) => {
       updates.name = sanitizedName;
     }
 
-    // ============================================
+
     // 2. VALIDATE USERNAME
-    // ============================================
     if (username !== undefined) {
       const sanitizedUsername = sanitize(username);
 
@@ -125,9 +122,7 @@ profileRouter.put("/", [imageFileUpload, protectUser], async (req, res) => {
       updates.username = sanitizedUsername;
     }
 
-    // ============================================
     // 3. VALIDATE AND PROCESS IMAGE
-    // ============================================
     if (file) {
       // ✅ Validate dimensions
       try {
@@ -150,7 +145,7 @@ profileRouter.put("/", [imageFileUpload, protectUser], async (req, res) => {
         });
       }
 
-      // ✅ Get old image URL
+      // Get old image URL
       const oldUserData = await connectionPool.query(
         "SELECT profile_pic FROM users WHERE id = $1",
         [userId],
@@ -189,18 +184,15 @@ profileRouter.put("/", [imageFileUpload, protectUser], async (req, res) => {
       }
     }
 
-    // ============================================
+
     // 4. CHECK IF ANY UPDATES
-    // ============================================
     if (Object.keys(updates).length === 0) {
       return res.status(400).json({
         message: "No fields to update provided",
       });
     }
 
-    // ============================================
     // 5. UPDATE DATABASE
-    // ============================================
     const fieldsToUpdate = [];
     const values = [];
     let paramIndex = 1;
