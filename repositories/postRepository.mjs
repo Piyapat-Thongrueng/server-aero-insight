@@ -82,7 +82,7 @@ const PostRepository = {
   },
   createPost: async (postData) => {
     return await connectionPool.query(
-      "INSERT INTO posts (title, image, category_id, description, content, status_id) VALUES ($1, $2, $3, $4, $5, $6)",
+      "INSERT INTO posts (title, image, category_id, description, content, status_id, user_id) VALUES ($1, $2, $3, $4, $5, $6, $7)",
       [
         postData.title,
         postData.image,
@@ -90,6 +90,7 @@ const PostRepository = {
         postData.description,
         postData.content,
         postData.status_id,
+        postData.user_id,
       ],
     );
   },

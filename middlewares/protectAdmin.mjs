@@ -1,9 +1,5 @@
-import { createClient } from "@supabase/supabase-js";
 import connectionPool from "../utils/db.mjs";
-const supabase = createClient(
-  process.env.SUPABASE_URL,
-  process.env.SUPABASE_ANON_KEY
-);
+import { supabase } from "../utils/supabase.mjs";
 const protectAdmin = async (req, res, next) => {
   const token = req.headers.authorization?.split(" ")[1];
   if (!token) {

@@ -1,15 +1,10 @@
 import { Router } from "express";
-import { createClient } from "@supabase/supabase-js";
 import connectionPool from "../utils/db.mjs";
 import protectUser from "../middlewares/protectUser.mjs";
 import multer from "multer";
 import sharp from "sharp";
 import { v4 as uuidv4 } from "uuid";
-
-const supabase = createClient(
-  process.env.SUPABASE_URL,
-  process.env.SUPABASE_ANON_KEY,
-);
+import { supabase } from "../utils/supabase.mjs";
 
 const profileRouter = Router();
 
@@ -59,7 +54,7 @@ const deleteOldImage = async (imageUrl, bucketName) => {
   }
 };
 
-profileRouter.put("/", [imageFileUpload, protectUser], async (req, res) => {
+profileRouter.put("/", [protectUser, imageFileUpload], async (req, res) => {
   const { id: userId } = req.user;
   const { name, username } = req.body;
   const file = req.files?.imageFile?.[0];
@@ -77,7 +72,8 @@ profileRouter.put("/", [imageFileUpload, protectUser], async (req, res) => {
         });
       }
 
-      const namePattern = /^[a-zA-Z\s'-]+$/;
+      // \p{L} ครอบคลุมตัวอักษรทุกภาษา (ไทย, อังกฤษ, ญี่ปุ่น ฯลฯ)
+      const namePattern = /^[\p{L}\s'-]+$/u;
       if (!namePattern.test(sanitizedName)) {
         return res.status(400).json({
           message:
@@ -176,10 +172,11 @@ profileRouter.put("/", [imageFileUpload, protectUser], async (req, res) => {
 
       updates.profile_pic = publicUrl;
 
-      // ✅ Delete old image (async)
+      // ลบรูปเก่าใน background โดยไม่บล็อก response
+      // หากลบไม่สำเร็จจะ log ไว้เพื่อให้ทราบว่า storage มีไฟล์ค้างอยู่
       if (oldImageUrl) {
         deleteOldImage(oldImageUrl, bucketName).catch((err) => {
-          console.error("Background image deletion failed:", err);
+          console.error("[STORAGE LEAK] Background image deletion failed — manual cleanup required:", err);
         });
       }
     }
@@ -193,11 +190,15 @@ profileRouter.put("/", [imageFileUpload, protectUser], async (req, res) => {
     }
 
     // 5. UPDATE DATABASE
+    // Whitelist column names เพื่อป้องกัน SQL Injection กรณีที่ updates object
+    // ถูกแก้ไขในอนาคตให้รับค่ามาจากภายนอก
+    const ALLOWED_COLUMNS = new Set(["name", "username", "profile_pic"]);
     const fieldsToUpdate = [];
     const values = [];
     let paramIndex = 1;
 
     for (const [key, value] of Object.entries(updates)) {
+      if (!ALLOWED_COLUMNS.has(key)) continue;
       fieldsToUpdate.push(`${key} = $${paramIndex++}`);
       values.push(value);
     }

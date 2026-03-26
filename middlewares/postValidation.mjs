@@ -3,6 +3,18 @@ const PostValidation = {
     const { title, image, category_id, description, content, status_id } =
       req.body;
 
+    if (title !== undefined && typeof title !== "string") {
+      return res.status(400).json({ error: "Title must be a string." });
+    }
+    if (image !== undefined && typeof image !== "string") {
+      return res.status(400).json({ error: "Image URL must be a string." });
+    }
+    if (description !== undefined && typeof description !== "string") {
+      return res.status(400).json({ error: "Description must be a string." });
+    }
+    if (content !== undefined && typeof content !== "string") {
+      return res.status(400).json({ error: "Content must be a string." });
+    }
     if (!title || title.trim() === "") {
       return res.status(400).json({ error: "Title is required." });
     }
@@ -20,18 +32,6 @@ const PostValidation = {
     }
     if (!status_id || isNaN(status_id)) {
       return res.status(400).json({ error: "Valid status ID is required." });
-    }
-    if (title && typeof title !== "string") {
-      return res.status(400).json({ error: "Title must be a string." });
-    }
-    if (image && typeof image !== "string") {
-      return res.status(400).json({ error: "Image URL must be a string." });
-    }
-    if (description && typeof description !== "string") {
-      return res.status(400).json({ error: "Description must be a string." });
-    }
-    if (content && typeof content !== "string") {
-      return res.status(400).json({ error: "Content must be a string." });
     }
     next();
   },

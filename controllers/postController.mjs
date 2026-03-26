@@ -26,6 +26,7 @@ const PostController = {
   createPost: async (req, res) => {
     const { title, image, category_id, description, content, status_id } =
       req.body;
+    const user_id = req.user.id;
     try {
       await PostService.createPost({
         title,
@@ -34,6 +35,7 @@ const PostController = {
         description,
         content,
         status_id,
+        user_id,
       });
       return res.status(201).json({
         message: "Created post successfully",
@@ -47,6 +49,9 @@ const PostController = {
   },
   getPostById: async (req, res) => {
     const { postId } = req.params;
+    if (!postId || isNaN(postId)) {
+      return res.status(400).json({ message: "Invalid post ID" });
+    }
     try {
       const post = await PostService.getPostById(postId);
 
@@ -64,6 +69,9 @@ const PostController = {
   },
   updatePost: async (req, res) => {
     const { postId } = req.params;
+    if (!postId || isNaN(postId)) {
+      return res.status(400).json({ message: "Invalid post ID" });
+    }
     const { title, image, category_id, description, content, status_id } =
       req.body;
     try {
