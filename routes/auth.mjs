@@ -9,6 +9,13 @@ const supabase = createClient(
   process.env.SUPABASE_ANON_KEY,
 );
 
+// supabaseAdmin ใช้ SERVICE_ROLE_KEY เพื่อทำ admin operations เช่น ลบ/อัปเดต user โดยไม่ต้องผ่าน session
+// ห้าม expose key นี้ให้ฝั่ง client เด็ดขาด — ใช้ได้เฉพาะ server-side เท่านั้น
+const supabaseAdmin = createClient(
+  process.env.SUPABASE_URL,
+  process.env.SUPABASE_SERVICE_ROLE_KEY,
+);
+
 // สร้าง Express Router สำหรับจัดการเส้นทางที่เกี่ยวข้องกับการตรวจสอบสิทธิ์ (Authentication)
 const authRouter = Router();
 
@@ -18,6 +25,12 @@ const authRouter = Router();
 authRouter.post("/register", async (req, res) => {
   // ดึงข้อมูลที่ user ส่งมาจาก request body ซึ่งประกอบด้วย email, password, username และ name
   const { email, password, username, name } = req.body;
+  if (!email || !password || !username || !name) {
+    return res.status(400).json({ error: "Email, password, username, and name are required" });
+  }
+  // ประกาศตัวแปร supabaseUserId ไว้นอก try เพื่อให้ catch block เข้าถึงได้
+  // จำเป็นสำหรับการลบ user ออกจาก Supabase Auth หาก DB insert ล้มเหลว (Orphaned User)
+  let supabaseUserId;
   try {
     const usernameCheckQuery = `
       SELECT * FROM users
@@ -29,7 +42,7 @@ authRouter.post("/register", async (req, res) => {
       usernameCheckQuery,
       usernameCheckValues,
     );
-    // หาก existingUser มีความยาวมากกว่า 0 แสดงว่ามีผู้ใช้ที่มีชื่อผู้ใช้นี้อยู่แล้ว เราจะส่ง response กลับไปยัง client ว่าชื่อผู้ใช้นี้ถูกใช้แล้ว
+    // หาก existingUser มีความยาวมากกว่า 0 แสดงว่ามี username นี้อยู่แล้ว เราจะส่ง response กลับไปยัง client ว่าชื่อผู้ใช้นี้ถูกใช้แล้ว
     if (existingUser.length > 0) {
       return res.status(400).json({ error: "This username is already taken" });
     }
@@ -41,7 +54,7 @@ authRouter.post("/register", async (req, res) => {
       password,
     });
 
-    // หากมีข้อผิดพลาดในการสร้างบัญชีผู้ใช้ใน Supabase Auth เราจะตรวจสอบว่าเป็นข้อผิดพลาดที่เกิดจากการที่มีผู้ใช้ที่มี email นี้อยู่แล้วหรือไม่ และส่ง response กลับไปยัง client ตามกรณี
+    // หากมีข้อผิดพลาดในการสร้างบัญชีผู้ใช้ในSupabase Auth เราจะตรวจสอบว่าเป็นข้อผิดพลาดที่เกิดจากการที่มีผู้ใช้ที่มี email นี้อยู่แล้วหรือไม่ และส่ง response กลับไปยัง client ตามกรณี
     if (supabaseError) {
       // ตรวจสอบว่า error code เป็น "user_already_exists" หรือไม่ ซึ่งหมายความว่ามีผู้ใช้ที่มี email นี้อยู่แล้วในระบบ
       if (supabaseError.code === "user_already_exists") {
@@ -55,7 +68,7 @@ authRouter.post("/register", async (req, res) => {
     }
 
     // หากการสร้างบัญชีผู้ใช้ใน Supabase Auth สำเร็จ เราจะได้รับข้อมูลผู้ใช้ใหม่ในตัวแปร data ซึ่งประกอบด้วยข้อมูลต่าง ๆ ของผู้ใช้ รวมถึง id ของผู้ใช้ที่ถูกสร้างขึ้น
-    const supabaseUserId = data.user.id;
+    supabaseUserId = data.user.id;
 
     // หลังจากที่เราสร้างบัญชีผู้ใช้ใน Supabase Auth สำเร็จ เราจะเพิ่มข้อมูลผู้ใช้ในตาราง users ของฐานข้อมูล PostgreSQL
     // โดยใช้ id ที่ได้จาก Supabase Auth เป็น primary key และเก็บข้อมูลเพิ่มเติมเช่น username, name และ role
@@ -76,6 +89,11 @@ authRouter.post("/register", async (req, res) => {
       user: rows[0],
     });
   } catch (error) {
+    // ถ้า Supabase Auth สร้าง user สำเร็จแล้วแต่ DB insert ล้มเหลว ให้ลบ user ออกจาก Supabase
+    // เพื่อป้องกัน Orphaned User (มีใน Auth แต่ไม่มีใน DB)
+    if (supabaseUserId) {
+      await supabaseAdmin.auth.admin.deleteUser(supabaseUserId);
+    }
     res.status(500).json({ error: "An error occurred during registration" });
   }
 });
@@ -93,7 +111,7 @@ authRouter.post("/login", async (req, res) => {
         error.message.includes("Invalid login credentials")
       ) {
         return res.status(400).json({
-          error: "Your password is incorrect or this email doesn't exist",
+          error: "Your password is incorrect or this email does not exist",
         });
       }
       return res.status(400).json({ error: error.message });
@@ -108,11 +126,16 @@ authRouter.post("/login", async (req, res) => {
 });
 // Route สำหรับดึงข้อมูลผู้ใช้ที่เข้าสู่ระบบแล้ว
 authRouter.get("/get-user", async (req, res) => {
+
+  // แยก token ออกจาก header ของ request โดยคาดว่า token จะถูกส่งมาในรูปแบบ "Bearer <token>" ดังนั้นเราจะใช้ split(" ") เพื่อแยกคำว่า "Bearer" ออกจาก token และดึงเฉพาะ token มาใช้งาน
   const token = req.headers.authorization?.split(" ")[1];
+  // หาก token ไม่มีอยู่ใน header เราจะส่ง response กลับไปยัง client ว่าการเข้าถึงถูกปฏิเสธเนื่องจากไม่มี token
   if (!token) {
     return res.status(401).json({ error: "Unauthorized: Token missing" });
   }
   try {
+    // เราจะใช้ token ที่ได้รับมาเพื่อตรวจสอบความถูกต้องและดึงข้อมูลผู้ใช้จาก Supabase Auth โดยใช้ supabase.auth.getUser(token)
+    // หาก token ไม่ถูกต้องหรือหมดอายุ เราจะส่ง response กลับไปยัง client ว่าการเข้าถึงถูกปฏิเสธเนื่องจาก token ไม่ถูกต้องหรือหมดอายุ
     const { data, error } = await supabase.auth.getUser(token);
     if (error) {
       return res.status(401).json({ error: "Unauthorized or token expired" });
@@ -143,8 +166,8 @@ authRouter.put("/reset-password", async (req, res) => {
   if (!token) {
     return res.status(401).json({ error: "Unauthorized: Token missing" });
   }
-  if (!newPassword) {
-    return res.status(400).json({ error: "New password is required" });
+  if (!oldPassword || !newPassword) {
+    return res.status(400).json({ error: "Both old and new passwords are required" });
   }
   try {
     const { data: userData } = await supabase.auth.getUser(token);
@@ -155,9 +178,13 @@ authRouter.put("/reset-password", async (req, res) => {
     if (loginError) {
       return res.status(400).json({ error: "Invalid old password" });
     }
-    const { error } = await supabase.auth.updateUser({
-      password: newPassword,
-    });
+    // ใช้ Admin API แทน supabase.auth.updateUser() เพื่อป้องกัน Race Condition
+    // supabase.auth.updateUser() อาศัย session ของ module-level client ที่ใช้ร่วมกันทุก request
+    // ถ้ามีหลาย request พร้อมกัน session อาจถูก overwrite ทำให้อัปเดต password ผิด user ได้
+    const { error } = await supabaseAdmin.auth.admin.updateUserById(
+      userData.user.id,
+      { password: newPassword },
+    );
     if (error) {
       return res.status(400).json({ error: error.message });
     }
