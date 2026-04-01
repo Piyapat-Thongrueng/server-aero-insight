@@ -75,6 +75,9 @@ authRouter.post("/register", async (req, res) => {
 // Route สำหรับการเข้าสู่ระบบ (Login)
 authRouter.post("/login", async (req, res) => {
   const { email, password } = req.body;
+  if (!email || !password) {
+    return res.status(400).json({ error: "Email and password are required" });
+  }
   try {
     const { data, error } = await supabase.auth.signInWithPassword({
       email,

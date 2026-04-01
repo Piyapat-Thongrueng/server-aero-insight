@@ -1,6 +1,46 @@
-// รับผิดชอบเฉพาะการจัดการ request และ response ที่เกี่ยวข้องกับ posts เท่านั้น ไม่มี logic อื่นใด
-
 import PostService from "../services/postService.mjs";
+import { supabase } from "../utils/supabase.mjs";
+import { v4 as uuidv4 } from "uuid";
+
+const BUCKET_NAME = "aeroinsight-storage";
+
+// Helper: ลบรูปเก่าเดิมออกจาก Supabase Storage ใน background โดยไม่บล็อก response
+const deleteOldPostImage = (imageUrl) => {
+  if (!imageUrl || !imageUrl.includes(BUCKET_NAME)) return;
+  try {
+    const url = new URL(imageUrl);
+    const pathParts = url.pathname.split("/");
+    const bucketIndex = pathParts.indexOf(BUCKET_NAME);
+    const filePath = pathParts.slice(bucketIndex + 1).join("/");
+    supabase.storage.from(BUCKET_NAME).remove([filePath]).catch((err) => {
+      console.error("[STORAGE LEAK] Post image deletion failed — manual cleanup required:", err);
+    });
+  } catch (err) {
+    console.error("[STORAGE LEAK] Failed to parse image URL for deletion:", err);
+  }
+};
+
+// Helper: อัปโหลดไฟล์ภาพไป Supabase Storage และคืน public URL
+const uploadPostImage = async (file, userId) => {
+  const fileExt = file.mimetype.split("/")[1];
+  const fileName = `${userId}-${uuidv4()}.${fileExt}`;
+  const filePath = `posts/${fileName}`;
+
+  const { data, error } = await supabase.storage
+    .from(BUCKET_NAME)
+    .upload(filePath, file.buffer, {
+      contentType: file.mimetype,
+      upsert: false,
+    });
+
+  if (error) throw new Error("Failed to upload image to storage");
+
+  const {
+    data: { publicUrl },
+  } = supabase.storage.from(BUCKET_NAME).getPublicUrl(data.path);
+
+  return publicUrl;
+};
 
 const PostController = {
   getAllPosts: async (req, res) => {
@@ -24,10 +64,15 @@ const PostController = {
     }
   },
   createPost: async (req, res) => {
-    const { title, image, category_id, description, content, status_id } =
-      req.body;
+    const { title, category_id, description, content, status_id } = req.body;
     const user_id = req.user.id;
+    const file = req.files?.imageFile?.[0];
+    // ตรวจสอบว่ามีไฟล์รูปภาพแนบมาด้วยหรือไม่
+    if (!file) {
+      return res.status(400).json({ message: "Image file is required." });
+    }
     try {
+      const image = await uploadPostImage(file, user_id);
       await PostService.createPost({
         title,
         image,
@@ -72,9 +117,20 @@ const PostController = {
     if (!postId || isNaN(postId)) {
       return res.status(400).json({ message: "Invalid post ID" });
     }
-    const { title, image, category_id, description, content, status_id } =
-      req.body;
+    const { title, category_id, description, content, status_id } = req.body;
+    const file = req.files?.imageFile?.[0];
     try {
+      // ดึงโพสต์เดิมเพื่อเอา image URL เดิม หากไม่ได้อัปโหลดรูปใหม่
+      const existingPost = await PostService.getPostById(postId);
+      if (!existingPost) {
+        return res.status(404).json({ message: "Post not found" });
+      }
+      let image = existingPost.image; // ใช้รูปเดิมเป็นค่าเริ่มต้น
+      if (file) {
+        image = await uploadPostImage(file, req.user.id);
+        // ลบรูปเก่าใน background หลังจากอัปโหลดรูปใหม่สำเร็จ
+        deleteOldPostImage(existingPost.image);
+      }
       const result = await PostService.updatePost(postId, {
         title,
         image,

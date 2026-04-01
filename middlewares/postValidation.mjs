@@ -1,13 +1,10 @@
 const PostValidation = {
   postValidate: (req, res, next) => {
-    const { title, image, category_id, description, content, status_id } =
+    const { title, category_id, description, content, status_id } =
       req.body;
 
     if (title !== undefined && typeof title !== "string") {
       return res.status(400).json({ error: "Title must be a string." });
-    }
-    if (image !== undefined && typeof image !== "string") {
-      return res.status(400).json({ error: "Image URL must be a string." });
     }
     if (description !== undefined && typeof description !== "string") {
       return res.status(400).json({ error: "Description must be a string." });
@@ -17,9 +14,6 @@ const PostValidation = {
     }
     if (!title || title.trim() === "") {
       return res.status(400).json({ error: "Title is required." });
-    }
-    if (!image || image.trim() === "") {
-      return res.status(400).json({ error: "Image URL is required." });
     }
     if (!category_id || isNaN(category_id)) {
       return res.status(400).json({ error: "Valid category ID is required." });
