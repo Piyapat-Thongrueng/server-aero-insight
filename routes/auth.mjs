@@ -94,9 +94,18 @@ authRouter.post("/login", async (req, res) => {
       }
       return res.status(400).json({ error: error.message });
     }
+
+    // ดึง role จาก DB เพื่อให้ frontend redirect ได้ถูกต้อง
+    const { rows } = await connectionPool.query(
+      "SELECT role FROM users WHERE id = $1",
+      [data.user.id],
+    );
+    const role = rows.length ? rows[0].role : "user";
+
     return res.status(200).json({
       message: "Signed in successfully",
       access_token: data.session.access_token,
+      role,
     });
   } catch (error) {
     return res.status(500).json({ error: "An error occurred during login" });
