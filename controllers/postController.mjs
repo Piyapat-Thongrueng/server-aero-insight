@@ -63,6 +63,17 @@ const PostController = {
       });
     }
   },
+  getMyPosts: async (req, res) => {
+    try {
+      const posts = await PostService.getMyPosts(req.user.id);
+      return res.status(200).json({ posts });
+    } catch (error) {
+      console.error("Error fetching my posts:", error);
+      return res.status(500).json({
+        message: "Server could not retrieve your posts due to a database error",
+      });
+    }
+  },
   createPost: async (req, res) => {
     const { title, category_id, description, content, status_id } = req.body;
     const user_id = req.user.id;
@@ -120,18 +131,23 @@ const PostController = {
     const { title, category_id, description, content, status_id } = req.body;
     const file = req.files?.imageFile?.[0];
     try {
-      // ดึงโพสต์เดิมเพื่อเอา image URL เดิม หากไม่ได้อัปโหลดรูปใหม่
-      const existingPost = await PostService.getPostById(postId);
+      // owner check: อนุญาตแก้ได้เฉพาะโพสต์ของ admin ที่ login อยู่
+      const existingPost = await PostService.getPostByIdAndOwner(
+        postId,
+        req.user.id,
+      );
       if (!existingPost) {
         return res.status(404).json({ message: "Post not found" });
       }
+
       let image = existingPost.image; // ใช้รูปเดิมเป็นค่าเริ่มต้น
       if (file) {
         image = await uploadPostImage(file, req.user.id);
         // ลบรูปเก่าใน background หลังจากอัปโหลดรูปใหม่สำเร็จ
         deleteOldPostImage(existingPost.image);
       }
-      const result = await PostService.updatePost(postId, {
+
+      const result = await PostService.updatePostByOwner(postId, req.user.id, {
         title,
         image,
         category_id,
@@ -139,6 +155,7 @@ const PostController = {
         content,
         status_id,
       });
+
       if (result.rowCount === 0) {
         return res.status(404).json({ message: "Post not found" });
       }
@@ -156,7 +173,7 @@ const PostController = {
       if (!postId || isNaN(postId)) {
         return res.status(400).json({ message: "Invalid post ID" });
       }
-      const result = await PostService.deletePost(postId);
+      const result = await PostService.deletePostByOwner(postId, req.user.id);
       if (result.rowCount === 0) {
         return res.status(404).json({ message: "Post not found" });
       }

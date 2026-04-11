@@ -107,7 +107,8 @@ const PostRepository = {
         p.likes_count as likes,
         p.content,
         p.status_id,
-        p.updated_at
+        p.updated_at,
+        p.user_id
       FROM posts p
       LEFT JOIN users u ON p.user_id = u.id
       LEFT JOIN categories c ON p.category_id = c.id
@@ -116,6 +117,62 @@ const PostRepository = {
 
     const result = await connectionPool.query(query, [postId]);
     return result.rows[0] || null; // ✅ Return null ถ้าไม่เจอ
+  },
+  findPostsByAuthor: async (filters) => {
+    const { userId } = filters;
+    const query = `
+      SELECT
+        p.id,
+        p.title,
+        p.description,
+        p.image,
+        p.status_id,
+        p.created_at,
+        p.updated_at,
+        c.name as category
+      FROM posts p
+      LEFT JOIN categories c ON p.category_id = c.id
+      WHERE p.user_id = $1
+      ORDER BY p.created_at DESC
+    `;
+
+    const { rows } = await connectionPool.query(query, [userId]);
+    return rows;
+  },
+  findPostByIdAndOwner: async (postId, userId) => {
+    const query = `
+      SELECT
+        p.id,
+        p.image,
+        c.name as category,
+        p.title,
+        p.description,
+        p.content,
+        p.status_id,
+        p.updated_at,
+        p.user_id
+      FROM posts p
+      LEFT JOIN categories c ON p.category_id = c.id
+      WHERE p.id = $1 AND p.user_id = $2
+    `;
+
+    const { rows } = await connectionPool.query(query, [postId, userId]);
+    return rows[0] || null;
+  },
+  updatePostByOwner: async (postId, userId, postData) => {
+    return await connectionPool.query(
+      "UPDATE posts SET title = $1, image = $2, category_id = $3, description = $4, content = $5, status_id = $6 WHERE id = $7 AND user_id = $8",
+      [
+        postData.title,
+        postData.image,
+        postData.category_id,
+        postData.description,
+        postData.content,
+        postData.status_id,
+        postId,
+        userId,
+      ],
+    );
   },
   updatePost: async (postId, postData) => {
     return await connectionPool.query(
@@ -129,6 +186,12 @@ const PostRepository = {
         postData.status_id,
         postId,
       ],
+    );
+  },
+  deletePostByOwner: async (postId, userId) => {
+    return await connectionPool.query(
+      "DELETE FROM posts WHERE id = $1 AND user_id = $2",
+      [postId, userId],
     );
   },
   deletePost: async (postId) => {

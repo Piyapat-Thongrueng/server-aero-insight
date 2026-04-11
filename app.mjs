@@ -4,6 +4,8 @@ import cors from "cors";
 import PostRouter from "./routes/postRoute.mjs";
 import authRouter from "./routes/auth.mjs";
 import profileRouter from "./routes/profileRoute.mjs";
+import adminProfileRouter from "./routes/adminProfileRoute.mjs";
+import categoryRouter from "./routes/categoryRoute.mjs";
 
 const app = express();
 const PORT = process.env.PORT || 4000;
@@ -22,6 +24,8 @@ app.use(
 app.use("/posts", PostRouter);
 app.use("/auth", authRouter);
 app.use("/profile", profileRouter);
+app.use("/admin/profile", adminProfileRouter);
+app.use("/categories", categoryRouter);
 
 app.listen(PORT, () => {
   console.log(`Server is running on http://localhost:${PORT}`);

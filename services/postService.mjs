@@ -27,11 +27,23 @@ const PostService = {
   createPost: async (postData) => {
     return await PostRepository.createPost(postData);
   },
+  getMyPosts: async (userId) => {
+    return await PostRepository.findPostsByAuthor({ userId });
+  },
   getPostById: async (postId) => {
     return await PostRepository.findPostById(postId);
   },
+  getPostByIdAndOwner: async (postId, userId) => {
+    return await PostRepository.findPostByIdAndOwner(postId, userId);
+  },
+  updatePostByOwner: async (postId, userId, postData) => {
+    return await PostRepository.updatePostByOwner(postId, userId, postData);
+  },
   updatePost: async (postId, postData) => {
     return await PostRepository.updatePost(postId, postData);
+  },
+  deletePostByOwner: async (postId, userId) => {
+    return await PostRepository.deletePostByOwner(postId, userId);
   },
   deletePost: async (postId) => {
     return await PostRepository.deletePost(postId);

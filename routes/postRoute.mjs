@@ -24,6 +24,7 @@ const imageFileUpload = multerUpload.fields([
 
 PostRouter.post("/", protectAdmin, imageFileUpload, PostValidation.postValidate, PostController.createPost);
 PostRouter.get("/", PostController.getAllPosts);
+PostRouter.get("/me", protectAdmin, PostController.getMyPosts);
 PostRouter.get("/:postId", PostController.getPostById);
 PostRouter.put("/:postId", protectAdmin, imageFileUpload, PostValidation.postValidate, PostController.updatePost);
 PostRouter.delete("/:postId", protectAdmin, PostController.deletePost);
