@@ -123,6 +123,97 @@ const PostController = {
       });
     }
   },
+  getMyLikeStatus: async (req, res) => {
+    const { postId } = req.params;
+    if (!postId || isNaN(postId)) {
+      return res.status(400).json({ message: "Invalid post ID" });
+    }
+
+    try {
+      const post = await PostService.getPostById(postId);
+      if (!post) {
+        return res.status(404).json({ message: "Post not found" });
+      }
+
+      const liked = await PostService.getUserLikeStatus(postId, req.user.id);
+      return res.status(200).json({ liked });
+    } catch (error) {
+      console.error("Error checking like status:", error);
+      return res.status(500).json({ message: "Server could not check like status" });
+    }
+  },
+  toggleLikePost: async (req, res) => {
+    const { postId } = req.params;
+    if (!postId || isNaN(postId)) {
+      return res.status(400).json({ message: "Invalid post ID" });
+    }
+
+    try {
+      const post = await PostService.getPostById(postId);
+      if (!post) {
+        return res.status(404).json({ message: "Post not found" });
+      }
+
+      const result = await PostService.toggleLikePost(postId, req.user.id);
+      return res.status(200).json({
+        message: result.liked ? "Post liked" : "Post unliked",
+        data: result,
+      });
+    } catch (error) {
+      console.error("Error toggling like:", error);
+      return res.status(500).json({ message: "Server could not toggle like" });
+    }
+  },
+  getCommentsByPostId: async (req, res) => {
+    const { postId } = req.params;
+    if (!postId || isNaN(postId)) {
+      return res.status(400).json({ message: "Invalid post ID" });
+    }
+
+    try {
+      const post = await PostService.getPostById(postId);
+      if (!post) {
+        return res.status(404).json({ message: "Post not found" });
+      }
+
+      const comments = await PostService.getCommentsByPostId(postId);
+      return res.status(200).json({ data: comments });
+    } catch (error) {
+      console.error("Error fetching comments:", error);
+      return res.status(500).json({ message: "Server could not fetch comments" });
+    }
+  },
+  createComment: async (req, res) => {
+    const { postId } = req.params;
+    if (!postId || isNaN(postId)) {
+      return res.status(400).json({ message: "Invalid post ID" });
+    }
+
+    const { comment_text } = req.body;
+
+    try {
+      const post = await PostService.getPostById(postId);
+      if (!post) {
+        return res.status(404).json({ message: "Post not found" });
+      }
+
+      const comment = await PostService.createComment(
+        postId,
+        req.user.id,
+        comment_text,
+      );
+
+      return res.status(201).json({
+        message: "Comment created successfully",
+        data: comment,
+      });
+    } catch (error) {
+      console.error("Error creating comment:", error);
+      return res.status(error.status || 500).json({
+        message: error.message || "Server could not create comment",
+      });
+    }
+  },
   updatePost: async (req, res) => {
     const { postId } = req.params;
     if (!postId || isNaN(postId)) {

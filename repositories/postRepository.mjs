@@ -40,21 +40,21 @@ const PostRepository = {
     if (category && keyword) {
       // ใช้ Parameterized Query เพื่อป้องกัน SQL Injection
       const whereClause =
-        " WHERE c.name ILIKE $1 AND (p.title ILIKE $2 OR p.content ILIKE $2)";
+        " WHERE LOWER(c.name) = LOWER($1) AND (p.title ILIKE $2 OR p.description ILIKE $2 OR p.content ILIKE $2)";
       countQuery += whereClause;
-      countValues = [`%${category}%`, `%${keyword}%`];
+      countValues = [category, `%${keyword}%`];
 
       query += whereClause + " ORDER BY p.created_at DESC LIMIT $3 OFFSET $4";
-      values = [`%${category}%`, `%${keyword}%`, limit, offset];
+      values = [category, `%${keyword}%`, limit, offset];
     } else if (category) {
-      const whereClause = " WHERE c.name ILIKE $1";
+      const whereClause = " WHERE LOWER(c.name) = LOWER($1)";
       countQuery += whereClause;
-      countValues = [`%${category}%`];
+      countValues = [category];
 
       query += whereClause + " ORDER BY p.created_at DESC LIMIT $2 OFFSET $3";
-      values = [`%${category}%`, limit, offset];
+      values = [category, limit, offset];
     } else if (keyword) {
-      const whereClause = " WHERE p.title ILIKE $1 OR p.content ILIKE $1";
+      const whereClause = " WHERE p.title ILIKE $1 OR p.description ILIKE $1 OR p.content ILIKE $1";
       countQuery += whereClause;
       countValues = [`%${keyword}%`];
 
@@ -124,7 +124,9 @@ const PostRepository = {
       SELECT
         p.id,
         p.title,
+        p.category_id,
         p.description,
+        p.content,
         p.image,
         p.status_id,
         p.created_at,
@@ -198,6 +200,97 @@ const PostRepository = {
     return await connectionPool.query("DELETE FROM posts WHERE id = $1", [
       postId,
     ]);
+  },
+  getUserLikeStatus: async (postId, userId) => {
+    const { rows } = await connectionPool.query(
+      "SELECT 1 FROM likes WHERE post_id = $1 AND user_id = $2 LIMIT 1",
+      [postId, userId],
+    );
+
+    return rows.length > 0;
+  },
+  toggleLikePost: async (postId, userId) => {
+    const client = await connectionPool.connect();
+
+    try {
+      await client.query("BEGIN");
+
+      const insertResult = await client.query(
+        "INSERT INTO likes (post_id, user_id) VALUES ($1, $2) ON CONFLICT (post_id, user_id) DO NOTHING RETURNING id",
+        [postId, userId],
+      );
+
+      let liked;
+      if (insertResult.rowCount > 0) {
+        liked = true;
+      } else {
+        await client.query(
+          "DELETE FROM likes WHERE post_id = $1 AND user_id = $2",
+          [postId, userId],
+        );
+        liked = false;
+      }
+
+      const { rows } = await client.query(
+        "SELECT likes_count FROM posts WHERE id = $1",
+        [postId],
+      );
+
+      await client.query("COMMIT");
+
+      return {
+        liked,
+        likesCount: rows[0]?.likes_count || 0,
+      };
+    } catch (error) {
+      await client.query("ROLLBACK");
+      throw error;
+    } finally {
+      client.release();
+    }
+  },
+  findCommentsByPostId: async (postId) => {
+    const { rows } = await connectionPool.query(
+      `
+        SELECT
+          c.id,
+          c.post_id,
+          c.user_id,
+          c.comment_text,
+          c.created_at,
+          u.name as user_name,
+          u.profile_pic as user_profile_pic
+        FROM comments c
+        LEFT JOIN users u ON c.user_id = u.id
+        WHERE c.post_id = $1
+        ORDER BY c.created_at DESC
+      `,
+      [postId],
+    );
+
+    return rows;
+  },
+  createComment: async ({ postId, userId, commentText }) => {
+    const { rows } = await connectionPool.query(
+      `
+        INSERT INTO comments (post_id, user_id, comment_text)
+        VALUES ($1, $2, $3)
+        RETURNING id, post_id, user_id, comment_text, created_at
+      `,
+      [postId, userId, commentText],
+    );
+
+    const comment = rows[0];
+    const userResult = await connectionPool.query(
+      "SELECT name, profile_pic FROM users WHERE id = $1",
+      [userId],
+    );
+
+    return {
+      ...comment,
+      user_name: userResult.rows[0]?.name || "Unknown",
+      user_profile_pic: userResult.rows[0]?.profile_pic || "",
+    };
   },
 };
 

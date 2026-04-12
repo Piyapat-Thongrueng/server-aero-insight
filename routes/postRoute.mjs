@@ -3,6 +3,7 @@ import PostController from "../controllers/postController.mjs";
 import PostValidation from "../middlewares/postValidation.mjs";
 import multer from "multer";
 import protectAdmin from "../middlewares/protectAdmin.mjs";
+import protectUser from "../middlewares/protectUser.mjs";
 
 const PostRouter = Router();
 const multerUpload = multer({
@@ -26,6 +27,10 @@ PostRouter.post("/", protectAdmin, imageFileUpload, PostValidation.postValidate,
 PostRouter.get("/", PostController.getAllPosts);
 PostRouter.get("/me", protectAdmin, PostController.getMyPosts);
 PostRouter.get("/:postId", PostController.getPostById);
+PostRouter.get("/:postId/comments", PostController.getCommentsByPostId);
+PostRouter.get("/:postId/likes/me", protectUser, PostController.getMyLikeStatus);
+PostRouter.post("/:postId/likes/toggle", protectUser, PostController.toggleLikePost);
+PostRouter.post("/:postId/comments", protectUser, PostController.createComment);
 PostRouter.put("/:postId", protectAdmin, imageFileUpload, PostValidation.postValidate, PostController.updatePost);
 PostRouter.delete("/:postId", protectAdmin, PostController.deletePost);
 
